@@ -136,7 +136,7 @@ std::tuple<std::vector<uint8_t>, int> ProtocolPacketHandler::rxPacket() {
                 }
 
                 // Re-calculate exact length
-                if (wait_length != (rxpacket[PKT_LENGTH] + PKT_LENGTH + 1)) {
+                if (wait_length != static_cast<size_t>(rxpacket[PKT_LENGTH] + PKT_LENGTH + 1)) {
                     wait_length = rxpacket[PKT_LENGTH] + PKT_LENGTH + 1;
                     continue;
                 }
@@ -282,7 +282,7 @@ std::tuple<std::vector<uint8_t>, int, uint8_t> ProtocolPacketHandler::readTxRx(u
     uint8_t error;
     std::tie(rxpacket, result, error) = txRxPacket(txpacket);
 
-    if (result == COMM_SUCCESS && rxpacket.size() >= PKT_PARAMETER0 + length) {
+    if (result == COMM_SUCCESS && rxpacket.size() >= static_cast<size_t>(PKT_PARAMETER0 + length)) {
         error = rxpacket[PKT_ERROR];
         data.insert(data.end(), rxpacket.begin() + PKT_PARAMETER0, rxpacket.begin() + PKT_PARAMETER0 + length);
     }
