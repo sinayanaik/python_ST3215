@@ -127,6 +127,11 @@ std::tuple<std::vector<uint8_t>, int> ProtocolPacketHandler::rxPacket() {
             }
 
             if (idx == 0) {  // Found at beginning
+                // Validate packet header before accessing
+                if (rx_length < 5) {
+                    continue;  // Need at least 5 bytes for valid packet
+                }
+                
                 if ((rxpacket[PKT_ID] > 0xFD) || (rxpacket[PKT_LENGTH] > RXPACKET_MAX_LEN) ||
                     (rxpacket[PKT_ERROR] > 0x7F)) {
                     // Invalid packet, remove first byte

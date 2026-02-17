@@ -38,6 +38,7 @@ bool ST3215::pingServo(uint8_t sts_id) {
 
 std::vector<uint8_t> ST3215::listServos() {
     std::vector<uint8_t> servos;
+    // Scan servos from 0 to 253 (254 is broadcast ID)
     for (int id = 0; id < 254; ++id) {
         if (pingServo(static_cast<uint8_t>(id))) {
             servos.push_back(static_cast<uint8_t>(id));
@@ -236,12 +237,12 @@ bool ST3215::setMode(uint8_t sts_id, uint8_t mode) {
 }
 
 bool ST3215::correctPosition(uint8_t sts_id, int16_t correction) {
-    uint16_t corr = std::abs(correction);
-    if (corr > MAX_CORRECTION) {
-        corr = MAX_CORRECTION;
+    uint16_t correction_magnitude = std::abs(correction);
+    if (correction_magnitude > MAX_CORRECTION) {
+        correction_magnitude = MAX_CORRECTION;
     }
     
-    std::vector<uint8_t> txpacket = {lobyte(corr), hibyte(corr)};
+    std::vector<uint8_t> txpacket = {lobyte(correction_magnitude), hibyte(correction_magnitude)};
     
     if (correction < 0) {
         txpacket[1] |= (1 << 3);
@@ -258,12 +259,12 @@ bool ST3215::rotate(uint8_t sts_id, int16_t speed) {
         return false;
     }
     
-    uint16_t abs_speed = std::abs(speed);
-    if (abs_speed > MAX_SPEED) {
-        abs_speed = MAX_SPEED;
+    uint16_t speed_magnitude = std::abs(speed);
+    if (speed_magnitude > MAX_SPEED) {
+        speed_magnitude = MAX_SPEED;
     }
     
-    std::vector<uint8_t> txpacket = {lobyte(abs_speed), hibyte(abs_speed)};
+    std::vector<uint8_t> txpacket = {lobyte(speed_magnitude), hibyte(speed_magnitude)};
     
     if (speed < 0) {
         txpacket[1] |= (1 << 7);
@@ -276,6 +277,11 @@ bool ST3215::rotate(uint8_t sts_id, int16_t speed) {
 }
 
 bool ST3215::moveTo(uint8_t sts_id, uint16_t position, uint16_t speed, uint8_t acc, bool wait) {
+    // Validate acceleration to prevent division by zero
+    if (acc == 0) {
+        acc = 1;  // Use minimum safe value
+    }
+    
     if (!setMode(sts_id, 0) || !setAcceleration(sts_id, acc) || !setSpeed(sts_id, speed)) {
         return false;
     }
@@ -434,15 +440,15 @@ std::tuple<std::optional<uint16_t>, std::optional<uint16_t>> ST3215::tareServo(u
             distance = static_cast<int>((max_pos - min_pos) / 2);
         }
         
-        // Calculate correction
-        int16_t corr;
+        // Calculate correction - use signed arithmetic to handle negative values properly
+        int16_t correction_value;
         if (min_pos > MAX_POSITION / 2) {
-            corr = min_pos - MAX_POSITION - 1;
+            correction_value = static_cast<int16_t>(min_pos) - static_cast<int16_t>(MAX_POSITION) - 1;
         } else {
-            corr = min_pos;
+            correction_value = static_cast<int16_t>(min_pos);
         }
         
-        if (correctPosition(sts_id, corr)) {
+        if (correctPosition(sts_id, correction_value)) {
             min_pos = 0;
             max_pos = distance * 2;
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
