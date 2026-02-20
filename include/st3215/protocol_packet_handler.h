@@ -147,12 +147,38 @@ public:
      */
     std::tuple<int, uint8_t> write2ByteTxRx(uint8_t sts_id, uint8_t address, uint16_t data);
 
+    // Split read/write Tx and Rx methods
+    int readTx(uint8_t sts_id, uint8_t address, uint8_t length);
+    std::tuple<std::vector<uint8_t>, int, uint8_t> readRx(uint8_t sts_id, uint8_t length);
+
+    int read1ByteTx(uint8_t sts_id, uint8_t address);
+    std::tuple<uint8_t, int, uint8_t> read1ByteRx(uint8_t sts_id);
+    int read2ByteTx(uint8_t sts_id, uint8_t address);
+    std::tuple<uint16_t, int, uint8_t> read2ByteRx(uint8_t sts_id);
+    int read4ByteTx(uint8_t sts_id, uint8_t address);
+    std::tuple<uint32_t, int, uint8_t> read4ByteRx(uint8_t sts_id);
+
+    int write4ByteTxOnly(uint8_t sts_id, uint8_t address, uint32_t data);
+    std::tuple<int, uint8_t> write4ByteTxRx(uint8_t sts_id, uint8_t address, uint32_t data);
+
+    int regWriteTxOnly(uint8_t sts_id, uint8_t address, uint8_t length, const std::vector<uint8_t>& data);
+    std::tuple<int, uint8_t> regWriteTxRx(uint8_t sts_id, uint8_t address, uint8_t length, const std::vector<uint8_t>& data);
+
+    int syncReadTx(uint8_t start_address, uint8_t data_length, const std::vector<uint8_t>& param, size_t param_length);
+    std::tuple<int, std::vector<uint8_t>> syncReadRx(uint8_t data_length, size_t param_length);
+    int syncWriteTxOnly(uint8_t start_address, uint8_t data_length, const std::vector<uint8_t>& param, size_t param_length);
+
     // Helper functions for byte manipulation
     uint16_t makeWord(uint8_t a, uint8_t b) const;
     uint32_t makeDWord(uint16_t a, uint16_t b) const;
     uint8_t lobyte(uint16_t w) const;
     uint8_t hibyte(uint16_t w) const;
     int16_t toHost(uint16_t a, uint8_t b) const;
+    int16_t toScs(int16_t a, uint8_t b) const;
+    uint16_t loword(uint32_t l) const;
+    uint16_t hiword(uint32_t h) const;
+    void setEnd(uint8_t end) { sts_end_ = end; }
+    uint8_t getEnd() const { return sts_end_; }
 
 protected:
     /**

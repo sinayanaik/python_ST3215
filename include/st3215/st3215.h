@@ -2,6 +2,7 @@
 #define ST3215_H
 
 #include "protocol_packet_handler.h"
+#include "group_sync_write.h"
 #include "port_handler.h"
 #include "values.h"
 #include <string>
@@ -32,6 +33,9 @@ public:
      * @brief Destructor
      */
     ~ST3215();
+
+    /// Synchronized write handler for multi-servo writes
+    std::unique_ptr<GroupSyncWrite> groupSyncWrite;
 
     // Servo Discovery and Communication
     
