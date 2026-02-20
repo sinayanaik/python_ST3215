@@ -16,6 +16,8 @@ set(LIBRARY_SOURCES
     src/port_handler.cpp
     src/protocol_packet_handler.cpp
     src/st3215.cpp
+    src/group_sync_write.cpp
+    src/group_sync_read.cpp
 )
 
 # Create shared library

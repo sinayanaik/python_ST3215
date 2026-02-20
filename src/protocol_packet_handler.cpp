@@ -383,4 +383,221 @@ std::tuple<int, uint8_t> ProtocolPacketHandler::write2ByteTxRx(uint8_t sts_id, u
     return writeTxRx(sts_id, address, 2, data_write);
 }
 
+int16_t ProtocolPacketHandler::toScs(int16_t a, uint8_t b) const {
+    if (a < 0) {
+        return (-a | (1 << b));
+    } else {
+        return a;
+    }
+}
+
+uint16_t ProtocolPacketHandler::loword(uint32_t l) const {
+    return l & 0xFFFF;
+}
+
+uint16_t ProtocolPacketHandler::hiword(uint32_t h) const {
+    return (h >> 16) & 0xFFFF;
+}
+
+int ProtocolPacketHandler::readTx(uint8_t sts_id, uint8_t address, uint8_t length) {
+    std::vector<uint8_t> txpacket(8, 0);
+
+    if (sts_id >= BROADCAST_ID) {
+        return COMM_NOT_AVAILABLE;
+    }
+
+    txpacket[PKT_ID] = sts_id;
+    txpacket[PKT_LENGTH] = 4;
+    txpacket[PKT_INSTRUCTION] = INST_READ;
+    txpacket[PKT_PARAMETER0 + 0] = address;
+    txpacket[PKT_PARAMETER0 + 1] = length;
+
+    int result = txPacket(txpacket);
+
+    if (result == COMM_SUCCESS) {
+        port_handler_->setPacketTimeout(length + 6);
+    }
+
+    return result;
+}
+
+std::tuple<std::vector<uint8_t>, int, uint8_t> ProtocolPacketHandler::readRx(uint8_t sts_id, uint8_t length) {
+    int result = COMM_TX_FAIL;
+    uint8_t error = 0;
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> rxpacket;
+
+    while (true) {
+        std::tie(rxpacket, result) = rxPacket();
+        if (result != COMM_SUCCESS || (rxpacket.size() > PKT_ID && rxpacket[PKT_ID] == sts_id)) {
+            break;
+        }
+    }
+
+    if (result == COMM_SUCCESS && rxpacket.size() > PKT_ID && rxpacket[PKT_ID] == sts_id) {
+        error = rxpacket[PKT_ERROR];
+        if (rxpacket.size() >= static_cast<size_t>(PKT_PARAMETER0 + length)) {
+            data.insert(data.end(), rxpacket.begin() + PKT_PARAMETER0, rxpacket.begin() + PKT_PARAMETER0 + length);
+        }
+    }
+
+    return std::make_tuple(data, result, error);
+}
+
+int ProtocolPacketHandler::read1ByteTx(uint8_t sts_id, uint8_t address) {
+    return readTx(sts_id, address, 1);
+}
+
+std::tuple<uint8_t, int, uint8_t> ProtocolPacketHandler::read1ByteRx(uint8_t sts_id) {
+    auto [data, result, error] = readRx(sts_id, 1);
+    uint8_t data_read = (result == COMM_SUCCESS && !data.empty()) ? data[0] : 0;
+    return std::make_tuple(data_read, result, error);
+}
+
+int ProtocolPacketHandler::read2ByteTx(uint8_t sts_id, uint8_t address) {
+    return readTx(sts_id, address, 2);
+}
+
+std::tuple<uint16_t, int, uint8_t> ProtocolPacketHandler::read2ByteRx(uint8_t sts_id) {
+    auto [data, result, error] = readRx(sts_id, 2);
+    uint16_t data_read = (result == COMM_SUCCESS && data.size() >= 2) ? makeWord(data[0], data[1]) : 0;
+    return std::make_tuple(data_read, result, error);
+}
+
+int ProtocolPacketHandler::read4ByteTx(uint8_t sts_id, uint8_t address) {
+    return readTx(sts_id, address, 4);
+}
+
+std::tuple<uint32_t, int, uint8_t> ProtocolPacketHandler::read4ByteRx(uint8_t sts_id) {
+    auto [data, result, error] = readRx(sts_id, 4);
+    uint32_t data_read = 0;
+    if (result == COMM_SUCCESS && data.size() >= 4) {
+        data_read = makeDWord(makeWord(data[0], data[1]), makeWord(data[2], data[3]));
+    }
+    return std::make_tuple(data_read, result, error);
+}
+
+int ProtocolPacketHandler::write4ByteTxOnly(uint8_t sts_id, uint8_t address, uint32_t data) {
+    std::vector<uint8_t> data_write = {
+        lobyte(loword(data)), hibyte(loword(data)),
+        lobyte(hiword(data)), hibyte(hiword(data))
+    };
+    return writeTxOnly(sts_id, address, 4, data_write);
+}
+
+std::tuple<int, uint8_t> ProtocolPacketHandler::write4ByteTxRx(uint8_t sts_id, uint8_t address, uint32_t data) {
+    std::vector<uint8_t> data_write = {
+        lobyte(loword(data)), hibyte(loword(data)),
+        lobyte(hiword(data)), hibyte(hiword(data))
+    };
+    return writeTxRx(sts_id, address, 4, data_write);
+}
+
+int ProtocolPacketHandler::regWriteTxOnly(uint8_t sts_id, uint8_t address, uint8_t length, const std::vector<uint8_t>& data) {
+    std::vector<uint8_t> txpacket(length + 7, 0);
+
+    txpacket[PKT_ID] = sts_id;
+    txpacket[PKT_LENGTH] = length + 3;
+    txpacket[PKT_INSTRUCTION] = INST_REG_WRITE;
+    txpacket[PKT_PARAMETER0] = address;
+
+    for (uint8_t i = 0; i < length; ++i) {
+        txpacket[PKT_PARAMETER0 + 1 + i] = data[i];
+    }
+
+    int result = txPacket(txpacket);
+    port_handler_->setUsing(false);
+
+    return result;
+}
+
+std::tuple<int, uint8_t> ProtocolPacketHandler::regWriteTxRx(uint8_t sts_id, uint8_t address, uint8_t length, const std::vector<uint8_t>& data) {
+    std::vector<uint8_t> txpacket(length + 7, 0);
+
+    txpacket[PKT_ID] = sts_id;
+    txpacket[PKT_LENGTH] = length + 3;
+    txpacket[PKT_INSTRUCTION] = INST_REG_WRITE;
+    txpacket[PKT_PARAMETER0] = address;
+
+    for (uint8_t i = 0; i < length; ++i) {
+        txpacket[PKT_PARAMETER0 + 1 + i] = data[i];
+    }
+
+    std::vector<uint8_t> rxpacket;
+    int result;
+    uint8_t error;
+    std::tie(rxpacket, result, error) = txRxPacket(txpacket);
+
+    return std::make_tuple(result, error);
+}
+
+int ProtocolPacketHandler::syncReadTx(uint8_t start_address, uint8_t data_length, const std::vector<uint8_t>& param, size_t param_length) {
+    std::vector<uint8_t> txpacket(param_length + 8, 0);
+
+    txpacket[PKT_ID] = BROADCAST_ID;
+    txpacket[PKT_LENGTH] = static_cast<uint8_t>(param_length + 4);
+    txpacket[PKT_INSTRUCTION] = INST_SYNC_READ;
+    txpacket[PKT_PARAMETER0 + 0] = start_address;
+    txpacket[PKT_PARAMETER0 + 1] = data_length;
+
+    for (size_t i = 0; i < param_length && i < param.size(); ++i) {
+        txpacket[PKT_PARAMETER0 + 2 + i] = param[i];
+    }
+
+    int result = txPacket(txpacket);
+    return result;
+}
+
+std::tuple<int, std::vector<uint8_t>> ProtocolPacketHandler::syncReadRx(uint8_t data_length, size_t param_length) {
+    size_t wait_length = (6 + data_length) * param_length;
+    port_handler_->setPacketTimeout(wait_length);
+    std::vector<uint8_t> rxpacket;
+    size_t rx_length = 0;
+    int result;
+
+    while (true) {
+        auto new_data = port_handler_->readPort(wait_length - rx_length);
+        rxpacket.insert(rxpacket.end(), new_data.begin(), new_data.end());
+        rx_length = rxpacket.size();
+
+        if (rx_length >= wait_length) {
+            result = COMM_SUCCESS;
+            break;
+        } else {
+            if (port_handler_->isPacketTimeout()) {
+                if (rx_length == 0) {
+                    result = COMM_RX_TIMEOUT;
+                } else {
+                    result = COMM_RX_CORRUPT;
+                }
+                break;
+            }
+        }
+    }
+
+    port_handler_->setUsing(false);
+    return std::make_tuple(result, rxpacket);
+}
+
+int ProtocolPacketHandler::syncWriteTxOnly(uint8_t start_address, uint8_t data_length, const std::vector<uint8_t>& param, size_t param_length) {
+    std::vector<uint8_t> txpacket(param_length + 8, 0);
+
+    txpacket[PKT_ID] = BROADCAST_ID;
+    txpacket[PKT_LENGTH] = static_cast<uint8_t>(param_length + 4);
+    txpacket[PKT_INSTRUCTION] = INST_SYNC_WRITE;
+    txpacket[PKT_PARAMETER0 + 0] = start_address;
+    txpacket[PKT_PARAMETER0 + 1] = data_length;
+
+    for (size_t i = 0; i < param_length && i < param.size(); ++i) {
+        txpacket[PKT_PARAMETER0 + 2 + i] = param[i];
+    }
+
+    std::vector<uint8_t> rxpacket;
+    int result;
+    uint8_t error;
+    std::tie(rxpacket, result, error) = txRxPacket(txpacket);
+
+    return result;
+}
+
 }  // namespace st3215

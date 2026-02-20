@@ -16,6 +16,8 @@ ST3215::ST3215(const std::string& device)
     
     // Update the base class to use our port handler
     ProtocolPacketHandler::port_handler_ = port_handler_.get();
+
+    groupSyncWrite = std::make_unique<GroupSyncWrite>(this, STS_ACC, 7);
 }
 
 ST3215::~ST3215() {
