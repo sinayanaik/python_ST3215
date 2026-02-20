@@ -145,8 +145,11 @@ d_acc = 0.5 × a × t_acc²
 
 If `d_acc ≥ d`, the servo never reaches full speed:
 ```
-t_wait = √(2 × d / a)
+t_wait = √(2 × d / acc)
 ```
+
+Note: Both the Python and C++ implementations use the raw `acc` register value
+(not `acc × 100`) in this formula. This provides a conservative (longer) wait time.
 
 ```
 Speed ▲
