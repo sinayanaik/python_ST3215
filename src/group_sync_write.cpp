@@ -71,6 +71,7 @@ int GroupSyncWrite::txPacket() {
 
     if (is_param_changed_ || param_.empty()) {
         makeParam();
+        is_param_changed_ = false;
     }
 
     return ph_->syncWriteTxOnly(start_address_, data_length_, param_,

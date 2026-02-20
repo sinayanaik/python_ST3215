@@ -1,4 +1,5 @@
 #include "st3215/group_sync_read.h"
+#include <array>
 
 namespace st3215 {
 
@@ -50,6 +51,7 @@ int GroupSyncRead::txPacket() {
 
     if (is_param_changed_ || param_.empty()) {
         makeParam();
+        is_param_changed_ = false;
     }
 
     return ph_->syncReadTx(start_address_, data_length_, param_, data_dict_.size());
@@ -95,7 +97,7 @@ std::tuple<std::vector<uint8_t>, int> GroupSyncRead::readRx(const std::vector<ui
     size_t rx_index = 0;
 
     while ((rx_index + 6 + data_length) <= rx_length) {
-        uint8_t headpacket[3] = {0, 0, 0};
+        std::array<uint8_t, 3> headpacket = {0, 0, 0};
         while (rx_index < rx_length) {
             headpacket[2] = headpacket[1];
             headpacket[1] = headpacket[0];
@@ -160,7 +162,11 @@ std::tuple<bool, uint8_t> GroupSyncRead::isAvailable(uint8_t sts_id, uint8_t add
 }
 
 uint32_t GroupSyncRead::getData(uint8_t sts_id, uint8_t address, uint8_t data_length) {
-    const auto& stored_data = data_dict_[sts_id];
+    auto it = data_dict_.find(sts_id);
+    if (it == data_dict_.end()) {
+        return 0;
+    }
+    const auto& stored_data = it->second;
     uint8_t offset = address - start_address_ + 1;
 
     if (data_length == 1) {
